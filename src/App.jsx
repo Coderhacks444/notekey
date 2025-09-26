@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import Navbar from "./component/Navbar";
-import { jsxs } from "react/jsx-runtime";
 import { MdDelete } from "react-icons/md";
 import { FiEdit } from "react-icons/fi";
 
@@ -10,85 +9,191 @@ function App() {
   const [idCounter, setIdCounter] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [currentTodo, setCurrentTodo] = useState(null);
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    let todosString = localStorage.getItem("todos");
-    let idCounterString = localStorage.getItem("idCounter");
-    if (todosString) {
-      let savedTodos = JSON.parse(todosString);
-      setTodos(savedTodos);
-    }
-    if (idCounterString) {
-      setIdCounter(JSON.parse(idCounterString));
+    try {
+      const todosString = localStorage.getItem("todos");
+      const idCounterString = localStorage.getItem("idCounter");
+      if (todosString) {
+        const savedTodos = JSON.parse(todosString);
+        setTodos(savedTodos);
+      }
+      if (idCounterString) {
+        setIdCounter(JSON.parse(idCounterString));
+      }
+    } catch (error) {
+      console.error("Error loading data from localStorage:", error);
+      localStorage.removeItem("todos");
+      localStorage.removeItem("idCounter");
     }
   }, []);
 
-  const saveToLS = () => {
+  useEffect(() => {
     localStorage.setItem("todos", JSON.stringify(todos));
     localStorage.setItem("idCounter", JSON.stringify(idCounter));
-  };
+  }, [todos, idCounter]);
+
+
 
   const handleAdd = () => {
+    if (todo.trim().length <= 3) return;
+    
     if (isEditing) {
-      setTodos(todos.map(item => 
-        item.id === currentTodo.id ? { ...item, todo } : item
-      ));
-      setIsEditing(false);
-      setCurrentTodo(null);
+      handleUpdate();
     } else {
-      setTodos([...todos, { id: idCounter, todo, isCompleted: false }]);
+      setTodos([...todos, { id: idCounter, todo: todo.trim(), isCompleted: false }]);
       setIdCounter(idCounter + 1);
     }
     setTodo("");
-    saveToLS();
+  };
+
+  const handleUpdate = () => {
+    setTodos(todos.map(item => 
+      item.id === currentTodo.id ? { ...item, todo: todo.trim() } : item
+    ));
+    setIsEditing(false);
+    setCurrentTodo(null);
   };
 
   const handleChange = (e) => {
     setTodo(e.target.value);
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && todo.trim().length > 3) {
+      handleAdd();
+    }
+  };
+
   const handleEdit = (id) => {
     const todoToEdit = todos.find(item => item.id === id);
-    setIsEditing(true);
-    setCurrentTodo(todoToEdit);
-    setTodo(todoToEdit.todo);
+    if (todoToEdit) {
+      setIsEditing(true);
+      setCurrentTodo(todoToEdit);
+      setTodo(todoToEdit.todo);
+    }
   };
 
   const handleDelete = (id) => {
     setTodos(todos.filter(item => item.id !== id));
-    saveToLS();
   };
+
+  const handleCheckbox = (id) => {
+    setTodos(todos.map(item => 
+      item.id === id ? { ...item, isCompleted: !item.isCompleted } : item
+    ));
+  };
+
+  const clearCompleted = () => {
+    setTodos(todos.filter(item => !item.isCompleted));
+  };
+
+  const filteredTodos = todos.filter(item => {
+    if (filter === "active") return !item.isCompleted;
+    if (filter === "completed") return item.isCompleted;
+    return true;
+  });
+
+  const completedCount = todos.filter(item => item.isCompleted).length;
+  const activeCount = todos.length - completedCount;
 
   return (
     <>
       <Navbar />
-      <div className="bg-gray-100 flex items-center justify-center p-6">
-        <div className="bg-slate-500 p-6 rounded-lg shadow-lg w-full min-h-[80vh]">
-          <h1 className="text-4xl font-bold mb-4">Todo App</h1>
-          <h2 className="text-2xl font-bold mb-4"  >Itask-Mange your todo in one place</h2>
+      <div className="min-h-screen bg-gray-100 py-6">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h1 className="text-4xl font-bold mb-2 text-gray-800">Todo App</h1>
+            <h2 className="text-xl text-gray-600 mb-6">iTask - Manage your todos in one place</h2>
 
-          <div className="flex mb-4">
-            <input onChange={handleChange} value={todo} type="text" className="w-1/2 rounded-lg" />
-            <button onClick={handleAdd} disabled={todo.length<=3} className="bg-blue-500 disabled:bg-indigo-700 hover:bg-sky-400 text-sm font-bold py-1 rounded-md text-white p-2 mx-6">
-              {isEditing ? "Update" : "Save"}
-            </button>
-          </div>
-          <h2 className="text-lg font-bold">Your Todos</h2>
-          <div className="todos"> 
-           $$ {todos.map(item => (
-              <div key={item.id} className="todo flex w-1/2 justify-normal my-2">
-                <div className={item.isCompleted ? "line-through" : ""}>
-                  {item.todo}
-                </div>
-                <button onClick={() => handleEdit(item.id)} className="buttons bg-orange-950 hover:bg-orange-900 p-2 py-1 text-sm font-bold text-white rounded-md mx-1">
-                <FiEdit />
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <input 
+                onChange={handleChange} 
+                onKeyPress={handleKeyPress}
+                value={todo} 
+                type="text" 
+                placeholder="Enter your task (min 4 characters)..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              />
+              <button 
+                onClick={handleAdd} 
+                disabled={todo.trim().length <= 3} 
+                className="bg-blue-500 disabled:bg-gray-400 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+              >
+                {isEditing ? "Update" : "Add Task"}
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Your Tasks ({activeCount} active, {completedCount} completed)
+              </h2>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setFilter("all")}
+                  className={`px-3 py-1 rounded text-sm ${filter === "all" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                >
+                  All
                 </button>
-                <button onClick={() => handleDelete(item.id)} className="buttons bg-orange-500 hover:bg-amber-800 p-2 py-1 text-sm font-bold text-white rounded-md mx-1">
-                <MdDelete />
+                <button 
+                  onClick={() => setFilter("active")}
+                  className={`px-3 py-1 rounded text-sm ${filter === "active" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                >
+                  Active
                 </button>
+                <button 
+                  onClick={() => setFilter("completed")}
+                  className={`px-3 py-1 rounded text-sm ${filter === "completed" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
+                >
+                  Completed
+                </button>
+                {completedCount > 0 && (
+                  <button 
+                    onClick={clearCompleted}
+                    className="px-3 py-1 rounded text-sm bg-red-500 text-white hover:bg-red-600"
+                  >
+                    Clear Completed
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
+            
+            {filteredTodos.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                {todos.length === 0 ? "No tasks yet. Add one above!" : `No ${filter} tasks.`}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredTodos.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border">
+                    <input 
+                      type="checkbox" 
+                      checked={item.isCompleted}
+                      onChange={() => handleCheckbox(item.id)}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div className={`flex-1 ${item.isCompleted ? "line-through text-gray-500" : "text-gray-800"}`}>
+                      {item.todo}
+                    </div>
+                    <button 
+                      onClick={() => handleEdit(item.id)} 
+                      className="bg-yellow-500 hover:bg-yellow-600 p-2 text-white rounded-md transition-colors"
+                      title="Edit task"
+                    >
+                      <FiEdit />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(item.id)} 
+                      className="bg-red-500 hover:bg-red-600 p-2 text-white rounded-md transition-colors"
+                      title="Delete task"
+                    >
+                      <MdDelete />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
         </div>
       </div>
     </>
